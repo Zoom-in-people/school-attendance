@@ -12,7 +12,7 @@
         body, html { margin: 0; padding: 0; height: 100%; font-family: 'Pretendard', 'Malgun Gothic', sans-serif; background-color: var(--bg); color: var(--text-main); }
         .container { display: flex; height: 100vh; overflow: hidden; }
 
-        /* 1단계: 학급 사이드바 (상시 노출) */
+        /* 1단계: 학급 사이드바 */
         .sidebar { width: 220px; background: var(--sidebar-bg); border-right: 1px solid #dee2e6; padding: 25px 15px; flex-shrink: 0; display: flex; flex-direction: column; }
         .sidebar h3 { font-size: 1.1em; margin-bottom: 20px; text-align: center; color: #343a40; }
         .class-list-container { flex-grow: 1; overflow-y: auto; }
@@ -27,10 +27,8 @@
         .category-btn { width: 100%; padding: 15px; margin-bottom: 10px; border: none; background: #e9ecef; border-radius: 12px; cursor: pointer; font-weight: bold; text-align: left; font-size: 1.1em; transition: 0.2s; display: flex; justify-content: space-between; align-items: center; }
         .category-btn:hover { background: #dee2e6; }
         .category-btn.active { background: var(--primary); color: white; }
-
-        .activity-sub-list { margin-bottom: 20px; padding-left: 10px; display: none; } /* 초기에는 숨김 */
+        .activity-sub-list { margin-bottom: 20px; padding-left: 10px; display: none; }
         .activity-sub-list.show { display: block; }
-        
         .activity-item { padding: 12px; background: #fff; border: 1px solid #eee; border-radius: 10px; margin-bottom: 8px; cursor: pointer; transition: 0.2s; }
         .activity-item:hover { border-color: var(--primary); }
         .activity-item.active { background: #e7f5ff; border-color: var(--primary); font-weight: bold; }
@@ -42,7 +40,14 @@
         .student-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(65px, 1fr)); gap: 10px; margin: 30px 0; }
         .btn-student { padding: 16px 0; border: 2px solid #e9ecef; background: #fff; border-radius: 10px; cursor: pointer; font-size: 1.1em; font-weight: bold; }
         .btn-student.selected { background: var(--accent); color: white; border-color: var(--accent); transform: scale(1.08); }
-        .btn-save { width: 100%; padding: 20px; background: var(--success); color: white; border: none; border-radius: 15px; font-size: 1.2em; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .btn-save { width: 100%; padding: 20px; background: var(--success); color: white; border: none; border-radius: 15px; font-size: 1.2em; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 30px; }
+        
+        /* ✨ 새로 추가된 예시 문구 카드 디자인 */
+        .example-card { background: #fff9db; border: 1px dashed #fab005; border-radius: 12px; padding: 20px; position: relative; }
+        .example-header { font-weight: bold; color: #f08c00; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+        .example-content { white-space: pre-wrap; color: #5c5f66; line-height: 1.6; font-size: 0.95em; }
+        .copy-hint { font-size: 0.8em; color: #adb5bd; margin-top: 10px; text-align: right; }
+
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-thumb { background: #ced4da; border-radius: 10px; }
     </style>
@@ -57,9 +62,7 @@
 
     <div class="list-area">
         <h3 id="listTitle">📋 활동 리스트</h3>
-        <div id="categoryContainer">
-            <div class="empty-msg" style="font-size: 1em; margin-top: 50px;">학급을 먼저 선택하세요.</div>
-        </div>
+        <div id="categoryContainer"><div class="empty-msg" style="font-size: 1em; margin-top: 50px;">학급을 먼저 선택하세요.</div></div>
     </div>
 
     <div class="detail-area" id="detailArea">
@@ -78,10 +81,9 @@
     let currentClass = '';
     let currentActivity = '';
     let currentDate = '';
+    let currentExample = ''; // 예시 문구 저장용
 
-    window.onload = async () => {
-        await Promise.all([fetchClasses(), fetchActivities()]);
-    };
+    window.onload = async () => { await Promise.all([fetchClasses(), fetchActivities()]); };
 
     async function fetchClasses() {
         const res = await fetch(`${BASE_URL}/classes`);
@@ -104,20 +106,16 @@
         allActivities = await res.json();
     }
 
-    // [1단계] 학급 선택 -> 해당 학년의 분류 버튼들을 보여줌
     function selectClass(className, btn) {
         currentClass = className;
         const grade = className.substring(0, 1);
-        
         document.querySelectorAll('.class-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
 
-        // 중간 영역 초기화 및 분류 렌더링
         const container = document.getElementById('categoryContainer');
         container.innerHTML = '';
         document.getElementById('detailArea').innerHTML = `<div class="empty-msg">분류와 활동을 선택해 주세요.</div>`;
 
-        // 해당 학년이 포함된 활동만 필터링 후 분류 추출
         const filteredActs = allActivities.filter(act => 
             act.학년.toString().split(',').map(s => s.trim()).includes(grade)
         );
@@ -128,54 +126,35 @@
             return acc;
         }, {});
 
-        if(Object.keys(groups).length === 0) {
-            container.innerHTML = '<div class="empty-msg" style="font-size:0.9em;">해당 학년의 활동이 없습니다.</div>';
-            return;
-        }
-
         for (const [category, acts] of Object.entries(groups)) {
-            // 분류 버튼
             const catBtn = document.createElement('button');
             catBtn.className = 'category-btn';
             catBtn.innerHTML = `<span>📂 ${category}</span> <span>▼</span>`;
-            
-            // 활동 리스트 (숨김 상태)
             const subList = document.createElement('div');
             subList.className = 'activity-sub-list';
-            
             acts.forEach(act => {
                 const item = document.createElement('div');
                 item.className = 'activity-item';
                 item.innerHTML = `<div class="activity-date">📅 ${act.날짜}</div><div>⚡ ${act.활동명}</div>`;
-                item.onclick = (e) => {
-                    e.stopPropagation();
-                    selectActivity(act, item);
-                };
+                item.onclick = (e) => { e.stopPropagation(); selectActivity(act, item); };
                 subList.appendChild(item);
             });
-
             catBtn.onclick = () => {
                 const isActive = subList.classList.contains('show');
                 document.querySelectorAll('.activity-sub-list').forEach(l => l.classList.remove('show'));
-                document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
-                if(!isActive) {
-                    subList.classList.add('show');
-                    catBtn.classList.add('active');
-                    catBtn.querySelector('span:last-child').innerText = '▲';
-                } else {
-                    catBtn.querySelector('span:last-child').innerText = '▼';
-                }
+                if(!isActive) { subList.classList.add('show'); catBtn.classList.add('active'); } 
+                else { catBtn.classList.remove('active'); }
             };
-
             container.appendChild(catBtn);
             container.appendChild(subList);
         }
     }
 
-    // [2단계] 활동 선택 -> 출결판 표시
     async function selectActivity(act, element) {
         currentActivity = act.활동명;
         currentDate = act.날짜;
+        currentExample = act.예시 || "등록된 예시 문구가 없습니다."; // 예시 데이터 할당
+        
         document.querySelectorAll('.activity-item').forEach(el => el.classList.remove('active'));
         element.classList.add('active');
 
@@ -187,6 +166,13 @@
             </div>
             <div class="student-grid" id="studentGrid"></div>
             <button class="btn-save" id="saveBtn" onclick="saveData()"><span>💾</span> 데이터 저장/수정 완료</button>
+            
+            <div class="example-card">
+                <div class="example-header">💡 나이스 기록 예시</div>
+                <div class="example-content" id="exampleText">${currentExample}</div>
+                <div class="copy-hint">문구를 드래그해서 복사(Ctrl+C)하여 사용하세요.</div>
+            </div>
+            
             <div id="status" style="display:none; text-align:center; margin-top:15px; color:var(--primary); font-weight:bold;">🚀 서버 전송 중...</div>
         `;
 
